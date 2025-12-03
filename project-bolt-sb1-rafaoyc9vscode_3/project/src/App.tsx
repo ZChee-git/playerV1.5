@@ -13,6 +13,7 @@ import { VideoLibrary } from './components/VideoLibrary';
 import { VideoPlayer } from './components/VideoPlayer';
 import { InstallPrompt } from './components/InstallPrompt';
 import { CollectionManager } from './components/CollectionManager';
+import { initToast, showToast } from './utils/toast';
 
 
 function App() {
@@ -71,9 +72,14 @@ function App() {
       return { ...prev, items: newItems, lastPlayedIndex: newLast };
     });
 
-    // 通知用户（项目若有 Toast 可替换）
+    // 通知用户（使用内置 toast，如果不可用回退到 alert）
     try {
-      alert('媒体文件不存在，已从列表移除。');
+      const win: any = window;
+      if (win && typeof win.showToast === 'function') {
+        win.showToast('媒体文件不存在，已从列表移除。');
+      } else {
+        alert('媒体文件不存在，已从列表移除。');
+      }
     } catch (e) {
       console.log('文件缺失，已移除：', videoId);
     }
@@ -92,6 +98,9 @@ function App() {
 
   // 保证预览进度实时刷新：lastPlayedIndex变化时自动刷新currentPreview
   useEffect(() => {
+    // 初始化全局 Toast（用于替代 alert 的非阻塞通知）
+    try { initToast(); } catch (e) { console.warn('initToast failed', e); }
+
     if (showPreview && currentPlaylist && previewType === 'new') {
       // 重新生成预览，带最新lastPlayedIndex
       const validItems = currentPlaylist.items

@@ -328,12 +328,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (vid && typeof onFileMissing === 'function') {
         try {
           onFileMissing(vid);
-          alert(`文件 "${title}" 未找到，已从列表移除`);
+          const win: any = window;
+          if (win && typeof win.showToast === 'function') {
+            win.showToast(`文件 "${title}" 未找到，已从列表移除`);
+          } else {
+            alert(`文件 "${title}" 未找到，已从列表移除`);
+          }
         } catch (err) {
           console.error('[播放器] 通知文件缺失时出错：', err);
         }
       } else if (vid) {
-        alert(`文件 "${title}" 未找到，请检查媒体库。`);
+        const win: any = window;
+        if (win && typeof win.showToast === 'function') {
+          win.showToast(`文件 "${title}" 未找到，请检查媒体库。`);
+        } else {
+          alert(`文件 "${title}" 未找到，请检查媒体库。`);
+        }
       }
     };
 
