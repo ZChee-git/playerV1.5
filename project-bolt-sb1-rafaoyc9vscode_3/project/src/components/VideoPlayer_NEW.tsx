@@ -10,6 +10,7 @@ interface VideoPlayerProps {
   onPlaylistComplete: () => void;
   initialIndex?: number;
   isAudioMode?: boolean;
+  onFileMissing?: (videoId: string) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -19,6 +20,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPlaylistComplete,
   initialIndex = 0,
   isAudioMode = false,
+  onFileMissing,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -277,6 +279,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     showControlsTemporarily();
   };
 
+  // 媒体加载错误处理：通知上层并提示用户
+  const handleMediaError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error('[播放器] 媒体加载错误：', e);
+    setVideoError(true);
+    setIsLoading(false);
+    const vid = currentVideo?.id;
+    const title = currentVideo?.name || '未知媒体';
+    if (vid && typeof onFileMissing === 'function') {
+      try {
+        onFileMissing(vid);
+        // 使用 alert 作为回退通知（项目中若有通知系统可替换）
+        alert(`文件 "${title}" 未找到，已从列表移除`);
+      } catch (err) {
+        console.error('[播放器] 通知文件缺失时出错：', err);
+      }
+    } else if (vid) {
+      alert(`文件 "${title}" 未找到，请检查媒体库。`);
+    }
+  };
+
   if (!currentVideo) {
     // 清除本地未完成的新学习播放列表
     const playlistsRaw = window.localStorage.getItem('playlists');
@@ -406,6 +428,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               }}
               onEnded={handleVideoEnded}
               onTimeUpdate={handleTimeUpdate}
+              onError={handleMediaError}
               onClick={showControlsTemporarily}
               onTouchStart={showControlsTemporarily}
               playsInline={true}

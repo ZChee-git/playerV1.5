@@ -482,6 +482,21 @@ export const usePlaylistManager = () => {
     setVideos(prev => prev.filter(v => v.id !== videoId));
   };
 
+  // 移除视频（对外接口）：删除文件并从播放列表中移除关联项
+  const removeVideoById = async (videoId: string) => {
+    try {
+      await deleteVideo(videoId);
+    } catch (error) {
+      console.error('usePlaylistManager: removeVideoById 删除文件失败:', videoId, error);
+    }
+
+    // 从所有 playlist 中移除该视频引用
+    setPlaylists(prev => prev.map(p => ({
+      ...p,
+      items: p.items.filter(item => item.videoId !== videoId),
+    })));
+  };
+
   const getVideoById = (id: string): VideoFile | undefined => {
     return videos.find(v => v.id === id);
   };
@@ -516,5 +531,6 @@ export const usePlaylistManager = () => {
     getVideoById,
     getTodayNewVideos,
     getTodayReviews,
+    removeVideoById,
   };
 };
