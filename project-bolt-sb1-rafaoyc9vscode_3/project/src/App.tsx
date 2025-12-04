@@ -13,7 +13,7 @@ import { VideoLibrary } from './components/VideoLibrary';
 import { VideoPlayer } from './components/VideoPlayer';
 import { InstallPrompt } from './components/InstallPrompt';
 import { CollectionManager } from './components/CollectionManager';
-import { initToast } from './utils/toast';
+import { initToast, showToast } from './utils/toast';
 
 
 function App() {
@@ -260,16 +260,7 @@ function App() {
             window.localStorage.setItem('playlists', JSON.stringify(filtered));
           }
         } catch (e) { /* ignore */ }
-        try {
-          const win: any = window;
-          if (win && typeof win.showToast === 'function') {
-            win.showToast('未完成的新学习视频已全部被删除，相关学习记录已自动清除。');
-          } else {
-            alert('未完成的新学习视频已全部被删除，相关学习记录已自动清除。');
-          }
-        } catch (e) {
-          console.log('未完成的新学习视频已全部被删除，相关学习记录已自动清除。');
-        }
+        alert('未完成的新学习视频已全部被删除，相关学习记录已自动清除。');
         window.location.reload();
         return;
       }
@@ -318,16 +309,7 @@ function App() {
       const message = currentPlaylist.isExtraSession 
         ? '恭喜！加餐学习任务已完成！' 
         : '恭喜！学习任务已完成！';
-      try {
-        const win: any = window;
-        if (win && typeof win.showToast === 'function') {
-          win.showToast(message);
-        } else {
-          alert(message);
-        }
-      } catch (e) {
-        console.log(message);
-      }
+      alert(message);
     }
     setShowPlayer(false);
     setCurrentPlaylist(null);

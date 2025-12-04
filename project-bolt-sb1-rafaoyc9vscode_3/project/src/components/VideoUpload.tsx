@@ -37,12 +37,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
         event.target.value = '';
       }
     } else if (!selectedCollection) {
-      const win: any = window;
-      if (win && typeof win.showToast === 'function') {
-        win.showToast('请先选择一个合辑');
-      } else {
-        alert('请先选择一个合辑');
-      }
+      alert('请先选择一个合辑');
     }
   };
 
@@ -55,12 +50,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
         event.target.value = '';
       }
     } else if (!selectedCollection) {
-      const win: any = window;
-      if (win && typeof win.showToast === 'function') {
-        win.showToast('请先选择一个合辑');
-      } else {
-        alert('请先选择一个合辑');
-      }
+      alert('请先选择一个合辑');
     }
   };
 
@@ -86,22 +76,11 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
             .map(item => `${item.file.name}: ${item.error}`)
             .join('\n');
           
-          const win: any = window;
-          const msg = `没有找到有效的视频文件：\n\n${errorSummary}${
+          alert(`没有找到有效的视频文件：\n\n${errorSummary}${
             validation.invalidFiles.length > 5 ? `\n... 还有 ${validation.invalidFiles.length - 5} 个文件有问题` : ''
-          }`;
-          if (win && typeof win.showToast === 'function') {
-            win.showToast(msg);
-          } else {
-            alert(msg);
-          }
+          }`);
         } else {
-          const win: any = window;
-          if (win && typeof win.showToast === 'function') {
-            win.showToast('没有找到支持的视频文件');
-          } else {
-            alert('没有找到支持的视频文件');
-          }
+          alert('没有找到支持的视频文件');
         }
         return;
       }
@@ -154,12 +133,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
         }
       }
       
-      const win: any = window;
-      if (win && typeof win.showToast === 'function') {
-        win.showToast(errorMessage);
-      } else {
-        alert(errorMessage);
-      }
+      alert(errorMessage);
     }
   };
 
@@ -177,12 +151,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
   const handleDrop = async (event: React.DragEvent) => {
     event.preventDefault();
     if (!selectedCollection) {
-      const win: any = window;
-      if (win && typeof win.showToast === 'function') {
-        win.showToast('请先选择一个合辑');
-      } else {
-        alert('请先选择一个合辑');
-      }
+      alert('请先选择一个合辑');
       return;
     }
 

@@ -314,12 +314,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }, 1000);
       }
     } else {
-      const win: any = window;
-      if (win && typeof win.showToast === 'function') {
-        win.showToast('视频加载失败次数过多，请检查文件是否损坏');
-      } else {
-        alert('视频加载失败次数过多，请检查文件是否损坏');
-      }
+      alert('视频加载失败次数过多，请检查文件是否损坏');
     }
   };
 
