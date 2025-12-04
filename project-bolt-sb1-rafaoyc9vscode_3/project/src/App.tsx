@@ -46,38 +46,7 @@ function App() {
     updatePlaylistProgress,
     getTodayNewVideos,
     getTodayReviews,
-    removeVideoById,
   } = usePlaylistManager();
-
-  // 当播放器检测到本地文件缺失时的处理：从存储中移除并更新当前播放列表
-  const handleFileMissing = async (videoId: string) => {
-    try {
-      await removeVideoById(videoId);
-    } catch (err) {
-      console.error('handleFileMissing: removeVideoById 失败', err);
-    }
-
-    // 如果处于单个点播模式，关闭播放器
-    if (singlePlayVideoId === videoId) {
-      setSinglePlayVideoId(null);
-      return;
-    }
-
-    // 如果当前有播放列表，更新它，移除缺失的项并调整 lastPlayedIndex
-    setCurrentPlaylist((prev: any) => {
-      if (!prev) return prev;
-      const newItems = prev.items.filter((it: any) => it.videoId !== videoId);
-  const newLast = Math.max(0, Math.min(prev.lastPlayedIndex, Math.max(0, newItems.length - 1)));
-      return { ...prev, items: newItems, lastPlayedIndex: newLast };
-    });
-
-    // 通知用户（项目若有 Toast 可替换）
-    try {
-      alert('媒体文件不存在，已从列表移除。');
-    } catch (e) {
-      console.log('文件缺失，已移除：', videoId);
-    }
-  };
 
   const [showPreview, setShowPreview] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -556,7 +525,6 @@ function App() {
           }}
           initialIndex={0}
           isAudioMode={false}
-          onFileMissing={handleFileMissing}
         />
       ) : (
         showHistory && !singlePlayVideoId && (
@@ -581,7 +549,6 @@ function App() {
           initialIndex={currentPlaylist.lastPlayedIndex}
           isAudioMode={currentPlaylist.playlistType === 'review'}
           onProgressUpdate={handleProgressUpdate}
-          onFileMissing={handleFileMissing}
         />
       )}
       {/* 已移除单独播放逻辑，回退到原始状态 */}

@@ -11,7 +11,6 @@ interface VideoPlayerProps {
   initialIndex?: number;
   isAudioMode?: boolean; // 新增：是否为音频模式
   onProgressUpdate?: (index: number) => void; // 新增：断点续播进度回传
-  onFileMissing?: (videoId: string) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -22,7 +21,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   initialIndex = 0,
   isAudioMode = false,
   onProgressUpdate,
-  onFileMissing,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   // 每次currentIndex变化时，回传进度
@@ -318,25 +316,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-    // 媒体加载错误处理：通知上层并提示用户
-    const handleMediaError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-      console.error('[播放器] 媒体加载错误：', e);
-      setVideoError(true);
-      setIsLoading(false);
-      const vid = currentVideo?.id;
-      const title = currentVideo?.name || '未知媒体';
-      if (vid && typeof onFileMissing === 'function') {
-        try {
-          onFileMissing(vid);
-          alert(`文件 "${title}" 未找到，已从列表移除`);
-        } catch (err) {
-          console.error('[播放器] 通知文件缺失时出错：', err);
-        }
-      } else if (vid) {
-        alert(`文件 "${title}" 未找到，请检查媒体库。`);
-      }
-    };
-
   const handleClose = () => {
     if (window.history.length > 1) {
       window.history.pushState(null, '', window.location.href);
@@ -478,7 +457,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               }}
               onEnded={handleVideoEnded}
               onTimeUpdate={handleTimeUpdate}
-              onError={handleMediaError}
               onClick={showControlsTemporarily}
               onTouchStart={showControlsTemporarily}
               playsInline={true}
