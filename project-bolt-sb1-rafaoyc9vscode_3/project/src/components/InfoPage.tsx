@@ -61,7 +61,7 @@ const InfoPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div style={{marginTop: '1em', wordWrap: 'break-word', overflow: 'hidden'}}>
             详细使用说明查看微信公众号 @肆张Pakhoi<br />
             <a
-              href="https://mp.weixin.qq.com/s/ve-MnWaJ0f-sMdgRPR1x0w"
+              href="https://xiaobot.net/post/13c235eb-6a1d-4c95-8192-9739f578f8ef"
               target="_blank"
               rel="noopener noreferrer"
               style={{ 
@@ -71,7 +71,7 @@ const InfoPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 lineHeight: '1.4'
               }}
             >
-              https://mp.weixin.qq.com/s/ve-MnWaJ0f-sMdgRPR1x0w
+              https://xiaobot.net/post/13c235eb-6a1d-4c95-8192-9739f578f8ef
             </a>
           </div>
         </div>
