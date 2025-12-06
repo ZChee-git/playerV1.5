@@ -40,10 +40,9 @@ export function useVideoManager() {
 
   const deleteVideo = (videoId: string) => {
     setVideos(prev => {
-      const deletedVideo = prev.find(video => video.id === videoId);
-      if (deletedVideo && deletedVideo.fileUrl) {
-        URL.revokeObjectURL(deletedVideo.fileUrl);
-      }
+      // Simply remove the video from state without revoking the URL immediately.
+      // This prevents triggering a video error event if the player is still trying to play it.
+      // The cleanup will happen automatically when the component unmounts via the useEffect below.
       return prev.filter(video => video.id !== videoId);
     });
   };
