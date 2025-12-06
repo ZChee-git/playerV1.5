@@ -9,9 +9,9 @@ interface VideoPlayerProps {
   onClose: () => void;
   onPlaylistComplete: () => void;
   initialIndex?: number;
-  isAudioMode?: boolean; // 新增：是否为音频模式
-  onProgressUpdate?: (index: number) => void; // 新增：断点续播进度回传
-  onFileMissing?: (videoId: string) => void;
+  isAudioMode?: boolean; // 是否为音频模式
+  onProgressUpdate?: (index: number) => void; // 断点续播进度回传
+  onFileMissing?: (videoId: string) => void; // 文件缺失时通知上层删除记录
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -26,29 +26,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 }) => {
   const [missingNotice, setMissingNotice] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  // 每次currentIndex变化时，回传进度
+
+  // 每次 currentIndex 变化时，回传进度
   useEffect(() => {
     if (onProgressUpdate) {
       onProgressUpdate(currentIndex);
     }
   }, [currentIndex, onProgressUpdate]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+
   const currentItem = playlist[currentIndex];
   const currentVideo = videos.find(v => v.id === currentItem?.videoId);
   const derivedAudioMode = currentVideo?.mediaType === 'audio';
   const [audioOnlyMode] = useState(isAudioMode || derivedAudioMode);
+
   const [userInteracted, setUserInteracted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [controlsTimeout, setControlsTimeout] = useState<number | null>(null);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeTime, setResumeTime] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastSaveTimeRef = useRef<number>(0);
+  const errorHandledRef = useRef(false); // 防止 error 多次触发
 
   // 使用 useRef 来避免 autoPlay 状态导致的重新渲染
   const autoPlayRef = useRef(true);
@@ -57,7 +63,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
 
-  // 监听用户交互
+  // 监听用户交互（为了解决自动播放限制）
   useEffect(() => {
     const handleUserInteraction = () => {
       setUserInteracted(true);
@@ -74,28 +80,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
+  // 如果 playlist 当前有项，但 videos 里找不到对应视频：自动提示并跳到下一个
+  useEffect(() => {
+    if (!currentItem) return; // 播放列表为空，什么也不做
+    if (!currentVideo) {
+      setMissingNotice('视频文件未找到，已跳过');
+      const timer = window.setTimeout(() => {
+        setMissingNotice(null);
+        // 到达最后一个就直接触发播放完成
+        if (currentIndex < playlist.length - 1) {
+          setCurrentIndex(currentIndex + 1);
+        } else {
+          onPlaylistComplete();
+        }
+      }, 1400);
+      return () => window.clearTimeout(timer);
+    }
+  }, [currentItem, currentVideo, currentIndex, playlist.length, onPlaylistComplete]);
+
+  // 切换视频时设置 video 元素和断点续播
   useEffect(() => {
     if (videoRef.current && currentVideo) {
+      const video = videoRef.current;
+
       setVideoError(false);
       setIsLoading(true);
       setRetryCount(0);
-      // 不在这里重置恢复提示状态，让 handleLoadedMetadata 来处理
-      
+      errorHandledRef.current = false; // 新视频重置错误处理标记
+
       // 重置视频元素
-      const video = videoRef.current;
       video.src = '';
       video.load();
-      
+
       // 设置新的视频源
-      video.src = currentVideo.fileUrl;
-      
+      video.src = (currentVideo as any).fileUrl;
+
       // 音频模式设置
       if (audioOnlyMode) {
         video.style.display = 'none';
       } else {
         video.style.display = 'block';
       }
-      
+
       // iOS Safari 特殊设置
       if (isIOS && isSafari) {
         video.playsInline = true;
@@ -104,18 +130,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } else {
         video.preload = 'metadata';
       }
-      
-      // 等待元数据加载
+
       const handleLoadedMetadata = () => {
         setIsLoading(false);
         setDuration(video.duration);
-        
+
         // 重置保存时间计时器
         lastSaveTimeRef.current = 0;
-        
+
         // 检查是否有播放进度需要恢复
         const savedProgress = getVideoPlayProgress(currentVideo.id);
-        if (savedProgress > 10 && savedProgress < video.duration - 10) { // 至少播放了10秒且不在最后10秒
+        if (savedProgress > 10 && savedProgress < video.duration - 10) {
           setResumeTime(savedProgress);
           setShowResumePrompt(true);
         } else {
@@ -127,7 +152,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const handleCanPlay = () => {
         setIsLoading(false);
         setVideoError(false);
-        
+
         // 自动播放逻辑
         if (autoPlayRef.current && currentIndex >= initialIndex && userInteracted) {
           setTimeout(() => {
@@ -154,26 +179,33 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       };
 
       const handleError = (e: any) => {
+        if (errorHandledRef.current) return;
+        errorHandledRef.current = true;
+
         console.error('Video error:', e);
         setIsLoading(false);
 
-        // If the current video exists, treat this as a missing/unavailable file and skip
         if (currentVideo) {
-          // notify parent (App) so it can show a global notice or take other non-destructive action
+          // 通知父组件删除记录（非物理删除）
           try {
             onFileMissing && onFileMissing(currentVideo.id);
           } catch (err) {
             console.error('onFileMissing handler failed', err);
           }
 
-          // show a transient in-player notice and skip to next after a short delay
+          // 短暂提示并自动跳到下一个
           setMissingNotice('视频文件未找到，已跳过');
           setTimeout(() => {
             setMissingNotice(null);
-            goToNext();
+            // 使用统一的跳转逻辑
+            if (currentIndex < playlist.length - 1) {
+              setCurrentIndex(currentIndex + 1);
+            } else {
+              onPlaylistComplete();
+            }
           }, 1400);
         } else {
-          // fallback to existing error UI when no currentVideo
+          // 极端情况下的兜底
           setVideoError(true);
         }
       };
@@ -188,7 +220,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         video.removeEventListener('error', handleError);
       };
     }
-  }, [currentIndex, currentVideo, audioOnlyMode, userInteracted]);
+  }, [
+    currentIndex,
+    currentVideo,
+    audioOnlyMode,
+    userInteracted,
+    initialIndex,
+    isIOS,
+    isSafari,
+    videoError,
+    onFileMissing,
+    playlist.length,
+    onPlaylistComplete,
+  ]);
 
   // 控制栏自动隐藏逻辑
   const hideControlsAfterDelay = () => {
@@ -226,14 +270,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleTimeUpdate = () => {
     if (videoRef.current && currentVideo) {
-      const currentTime = videoRef.current.currentTime;
-      setCurrentTime(currentTime);
-      
+      const ct = videoRef.current.currentTime;
+      setCurrentTime(ct);
+
       // 使用时间间隔保存播放进度，避免依赖精确的整数秒
       const now = Date.now();
-      if (!lastSaveTimeRef.current || now - lastSaveTimeRef.current >= 5000) { // 每5秒保存一次
-        if (currentTime > 0) {
-          saveVideoPlayProgress(currentVideo.id, currentVideo.name, currentTime);
+      if (!lastSaveTimeRef.current || now - lastSaveTimeRef.current >= 5000) {
+        if (ct > 0) {
+          saveVideoPlayProgress(currentVideo.id, currentVideo.name, ct);
           lastSaveTimeRef.current = now;
         }
       }
@@ -248,13 +292,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  // 恢复前进/后退与时间格式化函数
+  // 前进/后退与时间格式化函数
   const goToNext = () => {
     // 清除当前视频的播放进度
     if (currentVideo) {
       clearVideoPlayProgress(currentVideo.id);
     }
-    
+
     if (currentIndex < playlist.length - 1) {
       setCurrentIndex(currentIndex + 1);
       setIsPlaying(false);
@@ -300,7 +344,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (currentVideo) {
       clearVideoPlayProgress(currentVideo.id);
     }
-    
+
     if (autoPlayRef.current && currentIndex < playlist.length - 1) {
       goToNext();
     } else if (currentIndex >= playlist.length - 1) {
@@ -313,13 +357,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setRetryCount(prev => prev + 1);
       setVideoError(false);
       setIsLoading(true);
-      
+
       if (videoRef.current && currentVideo) {
         const video = videoRef.current;
         video.src = '';
         video.load();
-        video.src = currentVideo.fileUrl;
-        
+        video.src = (currentVideo as any).fileUrl;
+
         setTimeout(() => {
           if (video.readyState >= 2) {
             const playPromise = video.play();
@@ -352,30 +396,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onClose();
     };
 
-    // 只在组件挂载时推送历史状态
     window.history.pushState({ modal: 'video-player' }, '', window.location.href);
     window.addEventListener('popstate', handlePopState);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []); // 移除 onClose 依赖，避免循环
-
-  if (!currentVideo) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 text-center max-w-sm mx-4">
-          <p className="text-xl text-gray-800 mb-4">视频文件未找到</p>
-          <button
-            onClick={handleClose}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg"
-          >
-            关闭
-          </button>
-        </div>
-      </div>
-    );
-  }
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
@@ -412,12 +439,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             {isLoading && (
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
                 <div className="text-white text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
                   <p>正在加载视频...</p>
                 </div>
               </div>
             )}
-            
+
             {/* 断点续播提示 */}
             {showResumePrompt && (
               <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">
@@ -443,9 +470,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </div>
               </div>
             )}
-            
+
             {/* 音频模式显示 */}
-            {audioOnlyMode && (
+            {audioOnlyMode && currentVideo && (
               <div
                 className="w-full h-full bg-gradient-to-br from-yellow-900 to-yellow-700 flex items-center justify-center"
                 onClick={showControlsTemporarily}
@@ -462,7 +489,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </div>
               </div>
             )}
-            
+
             <video
               ref={videoRef}
               className={`w-full h-full bg-black ${audioOnlyMode ? 'hidden' : 'block'}`}
@@ -483,12 +510,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               onTouchStart={showControlsTemporarily}
               playsInline={true}
               controls={false}
-              style={{ objectFit: 'contain' }}
+              style= objectFit: 'contain' 
             />
           </>
         )}
-        
-        {/* Transient missing-file notice (non-blocking) */}
+
+        {/* Transient missing-file notice (非阻塞提示） */}
         {missingNotice && (
           <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-400 text-black px-4 py-2 rounded shadow">
             {missingNotice}
@@ -513,8 +540,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
-            
-            {/* Control Buttons - 3倍大小 */}
+
+            {/* Control Buttons */}
             <div className="flex items-center justify-center space-x-8">
               <button
                 onClick={goToPrevious}
@@ -523,7 +550,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               >
                 <SkipBack size={54} />
               </button>
-              
+
               <button
                 onClick={togglePlay}
                 className="bg-white/20 text-white p-6 rounded-full hover:bg-white/30 transition-all"
@@ -531,17 +558,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               >
                 {isPlaying ? <Pause size={60} /> : <Play size={60} />}
               </button>
-              
+
               <button
                 onClick={goToNext}
                 disabled={currentIndex === playlist.length - 1}
-                className="text-white p-4 rounded-full hover:bg-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-white p-4 rounded-full hover:bg白/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipForward size={54} />
               </button>
-              
+
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="text-white p-4 rounded-full hover:bg-white/20 transition-all"
               >
                 <X size={54} />
@@ -549,27 +576,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
         )}
+
+        <style>{`
+          .slider::-webkit-slider-thumb {
+            appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+          }
+          .slider::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+          }
+        `}</style>
       </div>
-      
-      <style>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-        }
-        
-        .slider::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: none;
-        }
-      `}</style>
     </div>
   );
 };
