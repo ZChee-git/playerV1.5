@@ -10,6 +10,7 @@ interface VideoPlayerProps {
   onPlaylistComplete: () => void;
   initialIndex?: number;
   isAudioMode?: boolean;
+  onFileMissing?: (videoId: string) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -19,7 +20,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPlaylistComplete,
   initialIndex = 0,
   isAudioMode = false,
+  onFileMissing,
 }) => {
+  const [missingNotice, setMissingNotice] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -152,8 +155,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const handleError = (e: any) => {
         console.error('Video error:', e);
-        setVideoError(true);
         setIsLoading(false);
+
+        if (currentVideo) {
+          try {
+            onFileMissing && onFileMissing(currentVideo.id);
+          } catch (err) {
+            console.error('onFileMissing handler failed', err);
+          }
+          setMissingNotice('视频文件未找到，已跳过');
+          setTimeout(() => {
+            setMissingNotice(null);
+            goToNext();
+          }, 1400);
+        } else {
+          setVideoError(true);
+        }
       };
 
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -345,6 +362,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
             )}
             
+            {/* transient missing-file notice */}
+            {missingNotice && (
+              <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-400 text-black px-4 py-2 rounded shadow">
+                {missingNotice}
+              </div>
+            )}
+
             {/* 断点续播提示 */}
             {showResumePrompt && (
               <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">

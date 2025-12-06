@@ -58,6 +58,7 @@ function App() {
   const [singlePlayVideoId, setSinglePlayVideoId] = useState<string|null>(null);
   // 已移除 singlePlayVideo 状态，回退到原始状态
   const [showInfo, setShowInfo] = useState(false);
+  const [globalNotice, setGlobalNotice] = useState<string | null>(null);
 
   // 保证预览进度实时刷新：lastPlayedIndex变化时自动刷新currentPreview
   useEffect(() => {
@@ -246,6 +247,13 @@ function App() {
   const handlePlayerClose = () => {
     setShowPlayer(false);
     setCurrentPlaylist(null);
+  };
+
+  // Called when a player reports a missing/unavailable file. Non-destructive: notify and continue.
+  const handleFileMissing = (videoId: string) => {
+    console.warn('File missing reported for', videoId);
+    setGlobalNotice('检测到视频文件缺失，已跳过该视频');
+    setTimeout(() => setGlobalNotice(null), 1800);
   };
 
   const handlePlaylistComplete = () => {
@@ -525,6 +533,7 @@ function App() {
           }}
           initialIndex={0}
           isAudioMode={false}
+          onFileMissing={handleFileMissing}
         />
       ) : (
         showHistory && !singlePlayVideoId && (
@@ -549,12 +558,20 @@ function App() {
           initialIndex={currentPlaylist.lastPlayedIndex}
           isAudioMode={currentPlaylist.playlistType === 'review'}
           onProgressUpdate={handleProgressUpdate}
+          onFileMissing={handleFileMissing}
         />
       )}
       {/* 已移除单独播放逻辑，回退到原始状态 */}
 
       {/* Install Prompt */}
       <InstallPrompt />
+
+      {/* Global transient notice for missing files */}
+      {globalNotice && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-400 text-black px-4 py-2 rounded shadow">
+          {globalNotice}
+        </div>
+      )}
 
       {/* Info Page Modal */}
       {showInfo && <InfoPage onBack={() => setShowInfo(false)} />}

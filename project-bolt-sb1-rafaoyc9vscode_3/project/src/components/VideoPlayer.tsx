@@ -11,6 +11,7 @@ interface VideoPlayerProps {
   initialIndex?: number;
   isAudioMode?: boolean; // 新增：是否为音频模式
   onProgressUpdate?: (index: number) => void; // 新增：断点续播进度回传
+  onFileMissing?: (videoId: string) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -21,7 +22,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   initialIndex = 0,
   isAudioMode = false,
   onProgressUpdate,
+  onFileMissing,
 }) => {
+  const [missingNotice, setMissingNotice] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   // 每次currentIndex变化时，回传进度
   useEffect(() => {
@@ -152,8 +155,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const handleError = (e: any) => {
         console.error('Video error:', e);
-        setVideoError(true);
         setIsLoading(false);
+
+        // If the current video exists, treat this as a missing/unavailable file and skip
+        if (currentVideo) {
+          // notify parent (App) so it can show a global notice or take other non-destructive action
+          try {
+            onFileMissing && onFileMissing(currentVideo.id);
+          } catch (err) {
+            console.error('onFileMissing handler failed', err);
+          }
+
+          // show a transient in-player notice and skip to next after a short delay
+          setMissingNotice('视频文件未找到，已跳过');
+          setTimeout(() => {
+            setMissingNotice(null);
+            goToNext();
+          }, 1400);
+        } else {
+          // fallback to existing error UI when no currentVideo
+          setVideoError(true);
+        }
       };
 
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -466,6 +488,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </>
         )}
         
+        {/* Transient missing-file notice (non-blocking) */}
+        {missingNotice && (
+          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-400 text-black px-4 py-2 rounded shadow">
+            {missingNotice}
+          </div>
+        )}
+
         {/* Controls Overlay - 音频模式下常显 */}
         {!videoError && (showControls || audioOnlyMode) && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
